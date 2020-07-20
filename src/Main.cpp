@@ -13,13 +13,19 @@ void equalizeClusterSize(BrownianDynamicEngine* model);
 
 const int num_thread(1);
 int totExecCycle(1), execCycle(0);
+std::string fileName;
+int targetNum; 
 
-int main() {
+int main(int argc,char* argv[]) {
+    if (argc == 3){
+        fileName = argv[1];
+        targetNum = atoi(argv[2]);
+    }
     thread *threads = new thread[num_thread];
     for (int idx = 0; idx < min(num_thread, totExecCycle); idx++){
         BrownianDynamicEngine* model = new BrownianDynamicEngine();
-        threads[idx] = thread(controlWithElectrodeArray, model);
-    //    threads[idx] = thread(equalizeClusterSize, model);
+        // threads[idx] = thread(controlWithElectrodeArray, model);
+       threads[idx] = thread(equalizeClusterSize, model);
     }
     
     for (int idx = 0; idx < num_thread && threads[idx].joinable(); idx++){
@@ -30,20 +36,19 @@ int main() {
 }
 
 void controlWithElectrodeArray(BrownianDynamicEngine* model){
-    model->initialization("test.txt");
-    model->coreBD("./library/fields/array/3x3_frame.txt", 0, 5, false);
-    // model->coreBD("./library/fields/array/3x3_frame.txt", 0.5, 2, false);
-    // model->coreBD("./library/fields/array/3x3_frame.txt", 1, 2, false);
-    // model->coreBD("./library/fields/array/3x3_frame.txt", 1.5, 2, false);
-    // model->coreBD("./library/fields/array/3x3_frame.txt", 2, 2, false);
-    model->coreBD("./library/fields/array/3x3_frame.txt", 5, 5, false);
-    model->coreBD("./library/fields/array/3x3_EP.txt", 0.5, 10, true, 100);
-}
+    model->initialization("fluid.txt");
+    model->coreBD("./library/fields/array/3x3_frame.txt", 0, 2);
+    model->DEP_quench("./library/fields/array/3x3_frame.txt", 1.75, 20);
+    }
 
 
 void equalizeClusterSize(BrownianDynamicEngine* model){
-    model->initialization("test.txt");
-    model->coreBD("./library/fields/array/3x3_quad.txt", 0.5, 10, false);
-    model->coreBD("./library/fields/array/3x3_EP.txt", 0.5, 10, true, 400);
-    model->coreBD("./library/fields/array/3x3_quad.txt", 5, 10, false);
+    model->initialization(fileName+".txt");
+    while (model->countNum(1, 1) > targetNum){
+        model->EP_move(targetNum);
+        model->DEP_quench("./library/fields/array/3x3_frame.txt", 1.75, 0.3);
+    }
+    model->DEP_quench("./library/fields/array/3x3_frame.txt", 2.5, 2);
+    model->DEP_quench("./library/fields/array/3x3_frame.txt", 4, 2);
+    model->DEP_quench("./library/fields/array/3x3_frame.txt", 1.75, 30);
 }

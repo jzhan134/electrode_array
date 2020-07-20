@@ -33,7 +33,8 @@ extern ofstream summary;
 struct BD_Particle{
     std::pair<double, double> coord;
     std::pair<double, double> F;
-    std::pair<double, double> E;
+    std::pair<double, double> EP;
+    std::pair<double, double> DEP;
     double D;
     int group;
     BD_Particle( std::pair<double, double> coord_) : coord(coord_){}
@@ -48,18 +49,20 @@ public:
         if (trajOs.is_open()){ trajOs.close();}
     }
     
-    virtual void initialization
+    void initialization
     (
         std::string startingConfig
     );
     
-    void coreBD
+    void DEP_quench
     (
         string fieldFileName,
         double fieldStrength_, 
-        double execTime,
-        bool isEP,
-        int targetNum=0
+        double execTime
+    );
+
+    void EP_move(
+        int targetNum
     );
         
     void GenerateRandomConfig();
@@ -71,7 +74,9 @@ public:
     
     void CalDss(); 
 
-    void barycentricInterpolation();
+    void barycentricInterpolation(
+        bool isEP
+    );
         
     void ReadDiffusivity();
     
@@ -93,7 +98,8 @@ public:
     ){
         int num = 0;
         for (int i = 0; i < p.size(); i++){
-            if (fabs(p[i].coord.first - (gridX-1)*60000) <= 30000 && fabs(p[i].coord.second- (gridY-1)*60000) <= 30000){
+            if (fabs(p[i].coord.first - (gridX-1)*60000) <= 30000 && 
+                fabs(p[i].coord.second- (gridY-1)*60000) <= 30000){
                 num++;
             }
         }
@@ -130,7 +136,6 @@ protected:
     const double ppPreFactor = 1e9 * (273 + tempr) * kb * 21.86 * 6.25 * 8 * pow(a,3);
     const double pfPreFactor = 1e9 * 2 * pi * 80 * 8.85e-12 * pow(a*1e-9, 3) * fcm;
     const double epPreFactor = 1.5 * 80 * 8.85e-12 * 1e-4 / (a*1e-9);
-    const double periodicWindow = 90000;
     
     
     static const int rgdssbin = 25;
@@ -144,12 +149,14 @@ protected:
 
     //BD_Particle p[np]; // coordinate and force of each particle
     std::vector<BD_Particle> p;
-    const int defaultParticleNumber = 3600;
+    const int defaultParticleNumber = 400;
+    const double periodicWindow = 90000;
     
     // data structure for lookup tables
     static const int E_tot = 801; 
     const double d_idx = 250; // (nm) resolution of field loop-up table
-    double ETable[E_tot][E_tot][2];
+    double EP_Table[E_tot][E_tot][2];
+    double DEP_Table[E_tot][E_tot][2];
     
     double fieldStrength; // applied field strength with respect to the table
     int elapsedTime; // elapsed time in a complete simulation cycle

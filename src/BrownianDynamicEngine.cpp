@@ -22,53 +22,126 @@ void BrownianDynamicEngine::initialization(
     // create new trajectory output file
     if (trajOs.is_open()) trajOs.close();
     trajOs.open("./traj/xyz" + cnt + ".dat");  
-    OutputTrajectory(trajOs);
+    // OutputTrajectory(trajOs);
 }
 
 // time step: 1e-4s
 // total time: 0.1s
 // output freq: 0.1s
-void BrownianDynamicEngine::coreBD(
-    string fieldFileName,
-    double fieldStrength_, 
-    double execTime,
-    bool isEP,
+void BrownianDynamicEngine::EP_move(
     int targetNum)  
 {
     double rijsep,xij, yij;
     double dx, dy;
     double randx(0), randy(0);
-    double EPStrength, prefactor;
-    double pfFactor = pfPreFactor * pow(fieldStrength_,2);
+    double EPStrength;
+    double pfFactor = pfPreFactor * pow(0,2);
     int iniNum = countNum(1, 1);
+
+    ReadE("./library/fields/array/3x3_EP.txt", true);
+    ReadE("./library/fields/array/test1.txt", false);
     
-    ReadE(fieldFileName, isEP);
-    
-    for (int t = 0; t < execTime; t++){
+    while (countNum(1, 1) > targetNum){
+        
         // update local particle diffusivity and field magnitudes per second of simulation 
         CalDss();
-        barycentricInterpolation();
-        
-        // update particle group, the group is used to reduce amount of pair-wise 
-        // comparison if two particles belong to different groups
-        for (auto it = p.begin(); it != p.end(); ++it)
-        {
-            it->group = round(it->coord.first/60000)*3 + round(it->coord.second/60000);
-        }
+        barycentricInterpolation(true);
         
         // simulation is discretized into 10000 steps of 0.1ms
         for (int step = 0; step < nstep; step++){ 
-            if (isEP) EPStrength = (countNum(1, 1) == iniNum) ? 0.4 : 0.05;
+            EPStrength = (countNum(1, 1) == iniNum) ? 0.4 : 0.05;
             std::for_each(p.begin(), p.end(), [](BD_Particle& p) {p.F = std::make_pair(0.0,0.0);});
-            // for (auto it = p.begin(); it != p.end(); ++it)
-            // {
-            //     it->F = std::make_pair(0.0,0.0);
-            // }
 
             #pragma omp parallel for
             for (auto p1 = p.begin(); p1 != p.end(); ++p1) {
                 for (auto p2 = std::next(p1); p2 != p.end(); ++p2){
-                    if (isEP || p1->group == p2->group){
+                    rijsep = Distance2D(p1,p2);
+                    if (rijsep < rcut){
+                        xij = p2->coord.first - p1->coord.first;
+                        yij = p2->coord.second - p1->coord.second;
+                        if (rijsep < 2*a + 40){
+                            dx = xij * (2*a + 40 - rijsep)  /sqrt(xij * xij + yij * yij);
+                            dy = yij * (2*a + 40 - rijsep)  /sqrt(xij * xij + yij * yij);
+                            p1->coord.first -= dx;
+                            p1->coord.second -= dy;
+                            p2->coord.first += dx;
+                            p2->coord.second += dy;
+                        } else {
+                            double Fpp = 1e18*kb*(tempr+273)*kappa*pfpp*exp(-kappa*(rijsep-2.0*a)/a)/a;
+                            p1->F.first -= Fpp*xij/rijsep;
+                            p1->F.second -= Fpp*yij/rijsep;
+                            p2->F.first += Fpp*xij/rijsep;
+                            p2->F.second += Fpp*yij/rijsep;
+                        }
+                    }
+                }
+                // EP particle-field interaction
+                p1->F.first += epPreFactor*EPStrength*p1->EP.first;
+                p1->F.second += epPreFactor*EPStrength*p1->EP.second;
+
+                // DEP particle-field interaction
+                p1->F.first += pfFactor*p1->DEP.first;
+                p1->F.second += pfFactor*p1->DEP.second;
+
+                // random displacement
+                randx =  rand_normal(gen) * sqrt(1.0 / p1->D);
+                randy =  rand_normal(gen) * sqrt(1.0 / p1->D);
+
+                // final displacement update is the summation of deterministic and random
+                p1->coord.first += p1->D * (p1->F.first*fac1 + randx*fac2) * dt;
+                p1->coord.second += p1->D * (p1->F.second*fac1 + randy*fac2) * dt;
+
+                // periodic boundary
+                if (p1->coord.first > periodicWindow) p1->coord.first = (p1->coord.first - 2*periodicWindow);
+                if (p1->coord.first  < -periodicWindow) p1->coord.first  = (p1->coord.first + 2*periodicWindow);
+                if (p1->coord.second > periodicWindow) p1->coord.second = (p1->coord.second - 2*periodicWindow);
+                if (p1->coord.second < -periodicWindow) p1->coord.second = (p1->coord.second + 2*periodicWindow);
+            }
+            if ((step+1) % 1000 == 0){
+                std::cout << "move " << (double) (elapsedTime++)/10 << endl;
+                OutputTrajectory(trajOs);
+            }
+
+            // exit as soon as target number is obtained
+            if (step % 500 == 0 && countNum(1, 1) <= targetNum) return;
+        }
+    }
+}
+
+// time step: 1e-4s
+// total time: 0.1s
+// output freq: 0.1s
+void BrownianDynamicEngine::DEP_quench(
+    string fieldFileName,
+    double fieldStrength_, 
+    double execTime)  
+{
+    double rijsep,xij, yij;
+    double dx, dy;
+    double randx(0), randy(0);
+    double pfFactor = pfPreFactor * pow(fieldStrength_,2);
+    int iniNum = countNum(1, 1);
+    
+    ReadE(fieldFileName, false);
+    
+    for (int t = 0; t < execTime*10; t++){
+        // update local particle diffusivity and field magnitudes per second of simulation 
+        CalDss();
+        barycentricInterpolation(false);
+
+        // update particle group, the group is used to reduce amount of pair-wise 
+        // comparison if two particles belong to different groups
+        for (auto it = p.begin(); it != p.end(); ++it) {
+            it->group = round(it->coord.first/60000)*3 + round(it->coord.second/60000);
+        }
+        
+        // simulation is discretized into 10000 steps of 0.1ms
+        for (int step = 0; step < nstep/10; step++){ 
+            std::for_each(p.begin(), p.end(), [](BD_Particle& p) {p.F = std::make_pair(0.0,0.0);});
+            #pragma omp parallel for
+            for (auto p1 = p.begin(); p1 != p.end(); ++p1) {
+                for (auto p2 = std::next(p1); p2 != p.end(); ++p2){
+                    if (p1->group == p2->group){
                         rijsep = Distance2D(p1,p2);
                         if (rijsep < rcut){
                             xij = p2->coord.first - p1->coord.first;
@@ -91,9 +164,8 @@ void BrownianDynamicEngine::coreBD(
                     }
                 }
                 // DEP particle-field interaction
-                prefactor = (isEP) ? epPreFactor*EPStrength : pfFactor;
-                p1->F.first += prefactor*p1->E.first;
-                p1->F.second += prefactor*p1->E.second;
+                p1->F.first += pfFactor*p1->DEP.first;
+                p1->F.second += pfFactor*p1->DEP.second;
 
                 // random displacement
                 randx =  rand_normal(gen) * sqrt(1.0 / p1->D);
@@ -109,15 +181,10 @@ void BrownianDynamicEngine::coreBD(
                 if (p1->coord.second > periodicWindow) p1->coord.second = (p1->coord.second - 2*periodicWindow);
                 if (p1->coord.second < -periodicWindow) p1->coord.second = (p1->coord.second + 2*periodicWindow);
             }
-            // output simulation result every 0.1s
-            // std::cout << step <<std::endl;
-            if (step % 1000 == 0){
+            if ((step+1) % 1000 == 0){
                 std::cout << (double) (elapsedTime++)/10 << endl;
                 OutputTrajectory(trajOs);
             }
-
-            // exit as soon as target number is obtained
-            if (isEP && step % 100 == 0 && countNum(1, 1) == targetNum) break;
         }
     }
 }
@@ -125,7 +192,7 @@ void BrownianDynamicEngine::coreBD(
 // at the beginning of every simulation second, the field applied on
 // every particle is approximated based on its instantaneous position
 // with barycentric interpolation
-void BrownianDynamicEngine::barycentricInterpolation()
+void BrownianDynamicEngine::barycentricInterpolation(bool isEP)
 {
     int x[3],y[3];
     double dx,dy;
@@ -166,8 +233,13 @@ void BrownianDynamicEngine::barycentricInterpolation()
         lambda3 = 1.0 - lambda1 - lambda2;
         
         // find weighted local field magnitudes
-        p1->E.first =  lambda1*ETable[x[0]][y[0]][0] + lambda2*ETable[x[1]][y[1]][0] + lambda3*ETable[x[2]][y[2]][0];
-        p1->E.second = lambda1*ETable[x[0]][y[0]][1] + lambda2*ETable[x[1]][y[1]][1] + lambda3*ETable[x[2]][y[2]][1];
+        if (isEP){
+            p1->EP.first =  lambda1*EP_Table[x[0]][y[0]][0] + lambda2*EP_Table[x[1]][y[1]][0] + lambda3*EP_Table[x[2]][y[2]][0];
+            p1->EP.second = lambda1*EP_Table[x[0]][y[0]][1] + lambda2*EP_Table[x[1]][y[1]][1] + lambda3*EP_Table[x[2]][y[2]][1];
+        }
+        p1->DEP.first =  lambda1*DEP_Table[x[0]][y[0]][0] + lambda2*DEP_Table[x[1]][y[1]][0] + lambda3*DEP_Table[x[2]][y[2]][0];
+        p1->DEP.second = lambda1*DEP_Table[x[0]][y[0]][1] + lambda2*DEP_Table[x[1]][y[1]][1] + lambda3*DEP_Table[x[2]][y[2]][1];
+        
     }
 }
 
@@ -190,7 +262,6 @@ void BrownianDynamicEngine::ReadE(const std::string filename, bool EPFlag) {
     for (int i = 0; i < filename.length(); i++) chksum += (int) filename[i];
     if (prevCheckSum == chksum) return;
     else prevCheckSum = chksum;
-    
     ifstream is;
     is.open(filename.c_str());
     assert(is.is_open());
@@ -202,30 +273,34 @@ void BrownianDynamicEngine::ReadE(const std::string filename, bool EPFlag) {
             stringstream linestream(line);
             linestream >> dum; // x
             linestream >> dum; // y
-            if (!EPFlag){
+            if (EPFlag){
+                linestream >> EP_Table[j][i][0];
+                linestream >> EP_Table[j][i][1];
+            } else{
                 linestream >> dum; // Ex
                 linestream >> dum; // Ey
+                linestream >> DEP_Table[j][i][0];
+                linestream >> DEP_Table[j][i][1];
             }
-            linestream >> ETable[j][i][0];
-            linestream >> ETable[j][i][1];
         }
     }
     is.close();
 }
 
-void BrownianDynamicEngine::ReadSavedConfig(string filename) {    
+void BrownianDynamicEngine::ReadSavedConfig(string filename) 
+{    
     ifstream is;
+    string line;
+    double dum, x, y;
+
     is.open(filename.c_str());
     assert(is.is_open());
-    string line;
-    stringstream  linestream;
-    double dum, x, y;
-    while(std::getline(is,line)) 
-    {
-        linestream << line;
-        linestream >> dum >> x >> y;
+    while(std::getline(is,line)) {
+        stringstream  linestream(line);
+        linestream >> dum;
+        linestream >> x;
+        linestream >> y;
         p.push_back(BD_Particle(std::make_pair(x*a,y*a)));
-        linestream.clear();
     }
     is.close();
 }
@@ -255,7 +330,7 @@ void BrownianDynamicEngine::ReadDiffusivity()
 void BrownianDynamicEngine::GenerateRandomConfig()
 { 
     std::set<int> hist;
-    int randMeshGrid = 180;
+    int randMeshGrid = 178;
     int temp;
     for (int i = 0; i < defaultParticleNumber; ++i)
     {

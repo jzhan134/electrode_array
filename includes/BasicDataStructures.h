@@ -39,4 +39,3 @@ struct BD_Particle{
 
 // const int np = 1000;      // particle number
 // size of field look-up table
-const double periodicWindow = 90000;
