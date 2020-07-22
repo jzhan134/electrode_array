@@ -6,7 +6,7 @@
     G_C6: global c6 value between [0,1]
 %}
 
-function [L_PSI6, L_C6, neighboridx, G_PSI6, G_C6,L_theta6] = ORDER_PARAMETER(CurrFrame)
+function [L_PSI6, L_C6, neighboridx, G_PSI6, G_C6] = ORDER_PARAMETER(CurrFrame)
 
 pnum = size(CurrFrame,1);   % particle number
 psir = zeros(pnum,1);       % real part of local psi6
@@ -14,13 +14,14 @@ psii = zeros(pnum,1);       % imaginary part of local psi6
 
 % output variables
 neighboridx = cell(pnum,1); % list of neighbors indices for each particle
-L_theta6 = zeros(1,pnum);   % theta value of each particle
 PSI6 = [0 0];               % real and imaginary parts of global psi6
 L_PSI6 = zeros(1,pnum);     % psi6 value of each particle
 L_C6 = zeros(1,pnum);
-dist= zeros(pnum,pnum);
-dh = 2.64;
 
+dh = 2.64;
+dx = zeros(pnum,pnum);
+dy = zeros(pnum,pnum);
+dist= zeros(pnum,pnum);
 
 % calculate pair-wise particle distances
 for p1 = 1:pnum
@@ -38,8 +39,6 @@ for p1 = 1:pnum
             
             % particle-particle angles
             theta = atan(dy(p1,p2)/dx(p1,p2));
-            L_theta6(p1) = L_theta6(p1) + theta;
-            L_theta6(p2) = L_theta6(p2) + theta;
             
             % real and imaginary parts of local psi6
             psir(p1) = psir(p1) + cos(6*theta);
@@ -55,19 +54,12 @@ for p1 = 1:pnum
 end
 
 for p1 = 1:pnum
-    
-    if size(neighboridx{p1},2) ~= 0
-        L_C6(p1) = L_C6(p1)/size(neighboridx{p1},2);
-        L_theta6(p1) = L_theta6(p1)/size(neighboridx{p1},2)*180/pi; 
-        psii(p1) = psii(p1)/size(neighboridx{p1},2);
-        psir(p1) = psir(p1)/size(neighboridx{p1},2);
-        L_PSI6(p1) = sqrt(psii(p1)^2 + psir(p1)^2);
-        
-        PSI6(1) = PSI6(1) + psii(p1)/pnum;
-        PSI6(2) = PSI6(2) + psir(p1)/pnum;
-    else
-        L_theta6(p1) = -30;
-    end
+    L_C6(p1) = L_C6(p1)/size(neighboridx{p1},2);
+    psii(p1) = psii(p1)/size(neighboridx{p1},2);
+    psir(p1) = psir(p1)/size(neighboridx{p1},2);
+    L_PSI6(p1) = sqrt(psii(p1)^2 + psir(p1)^2);
+    PSI6(1) = PSI6(1) + psii(p1)/pnum;
+    PSI6(2) = PSI6(2) + psir(p1)/pnum;
     
     neighboridx{p1} = sort(cat(2,neighboridx{p1},p1)); 
     

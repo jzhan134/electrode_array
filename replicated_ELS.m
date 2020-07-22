@@ -9,7 +9,7 @@ fcm = 0.4667;
 pref = 2*pi*epsilon*a^3*fcm/kT;
 
 %% read electric field file
-data = load("./library/fields/array/test_1.txt");
+data = load("./library/fields/5v5.txt");
 Ex = reshape(data(:,3),[801,801]);
 Ey = reshape(data(:,4),[801,801]);
 Fx = reshape(data(:,5),[801,801]);
@@ -18,10 +18,10 @@ Ex = Ex(281:521,281:521);
 Ey = Ey(281:521,281:521);
 Fx = Fx(281:521,281:521);
 Fy = Fy(281:521,281:521);
-Ex = imgaussfilt(Ex,10);
-Ey = imgaussfilt(Ey,10);
-Fx = imgaussfilt(Fx,10);
-Fy = imgaussfilt(Fy,10);
+Ex = imgaussfilt(Ex,1);
+Ey = imgaussfilt(Ey,1);
+Fx = imgaussfilt(Fx,1);
+Fy = imgaussfilt(Fy,1);
 
 GB_Ex = zeros(801,801);
 GB_Ey = zeros(801,801);
@@ -57,4 +57,4 @@ newData(:,3) = reshape(GB_Ex,[801*801,1]);
 newData(:,4) = reshape(GB_Ey,[801*801,1]);
 newData(:,5) = reshape(GB_Fx,[801*801,1]);
 newData(:,6) = reshape(GB_Fy,[801*801,1]);
-save("./library/fields/array/test1.txt", "newData",'-ascii')
+save("./library/fields/array/5v5.txt", "newData",'-ascii')

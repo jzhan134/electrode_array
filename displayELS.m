@@ -1,6 +1,6 @@
 clear
 clc
-file ="./library/fields/array/3x3_frame.txt";
+file ="./library/fields/3x3_frame_II.txt";
 set(0,'DefaultFigureWindowStyle','normal')
 x = -100:0.25:100;
 [xx,yy] = meshgrid(x,x);
@@ -16,8 +16,6 @@ Ex = reshape(data(:,3),[length(x),length(x)]);
 Ey = reshape(data(:,4),[length(x),length(x)]);
 Fx = reshape(data(:,5),[length(x),length(x)]);
 Fy = reshape(data(:,6),[length(x),length(x)]);
-% Ex = imgaussfilt(Ex,10);
-% Ey = imgaussfilt(Ey,10);
 E = sqrt(Ex.^2 + Ey.^2);
 E = E./(1e4);
 for i = 1:801

@@ -5,17 +5,18 @@ clear
 clc
 set(0,'DefaultFigureWindowStyle','normal')
 a = 0.8;
-data = load('library/configurations/3600_quench2.txt');
+data = load('library/configurations/test2.txt');
 CF = data;
 % N0 = [0, 0];
 % N1 = [0,-1];
-N0 = [0, 1];
+N0 = [0, 0];
 N1 = [0, 0];
 out = preprocess(CF, N0, N1, 3);
-N0 = [1,1];
-N1 = [0,-1];
-out2 = preprocess(CF, N0, N1, 3);
-res = [out;out2];
+res = out;
+% N0 = [1,1];
+% N1 = [0,-1];
+% out2 = preprocess(CF, N0, N1, 3);
+% res = [out;out2];
 res(:,1) = (0:size(res,1)-1)';
 
 figure(11)
@@ -35,4 +36,4 @@ set(sb,'position',[0 0 1 1])
 box on
 hold off
 drawnow;
-save('library/configurations/test2.txt','res','-ascii')
+save('library/configurations/single_cluster.txt','res','-ascii')

@@ -150,7 +150,7 @@ protected:
     //BD_Particle p[np]; // coordinate and force of each particle
     std::vector<BD_Particle> p;
     const int defaultParticleNumber = 400;
-    const double periodicWindow = 90000;
+    const double periodicWindow = 30000;
     
     // data structure for lookup tables
     static const int E_tot = 801; 
